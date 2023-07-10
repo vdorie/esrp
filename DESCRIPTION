@@ -1,0 +1,18 @@
+Package: esrp
+Version: 1.0-0
+Date: 2023-07-10
+Title: Efficient Sparse Random Projections
+Authors@R: c(
+  person("Vincent", "Dorie", role = c("aut", "cre"), email = "vdorie@gmail.com", comment = c(ORCID = "0000-0002-9576-3064")))
+Depends:
+  R (>= 4.0-0)
+Imports:
+  parallel
+LinkingTo:
+  BH
+Description: Efficiently fits sparse random projections of input vectors, allowing for computing millions of output dimensions on consumer grade hardware.
+License: GPL (>= 2)
+NeedsCompilation: yes
+Biarch: yes
+URL: https://github.com/vdorie/esrp
+BugReports: https://github.com/vdorie/esrp/issues

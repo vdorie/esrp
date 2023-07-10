@@ -1,0 +1,5 @@
+useDynLib(esrp, .registration = TRUE, .fixes = "C_")
+
+export(generate_random_projections)
+
+importFrom(parallel, makeCluster, clusterExport, clusterEvalQ, clusterMap, stopCluster)
