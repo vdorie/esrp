@@ -3,8 +3,12 @@ Efficient Sparse Random Projections
 
 ## Installation
 
-1. From within R, install the `remotes` package, i.e. `install.packages("remotes")`.
-2. Execute `install_github("vdorie/esrp")`
+1. Install your platform's R toolchain.
+   * For Mac, install [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12).
+   * For Windows, install [Rtools](https://cran.r-project.org/bin/windows/Rtools/rtools43/rtools.html).
+   * For Linux, use your package manager to install gcc or clang (e.g. on [Debian](https://linuxize.com/post/how-to-install-gcc-compiler-on-debian-10/)). It is extremely likely that this is installed already.
+2. From within R, install the `remotes` package, i.e. `install.packages("remotes")`.
+3. Execute `install_github("vdorie/esrp")`
 
 ## Example
 
