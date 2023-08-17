@@ -19,7 +19,18 @@
 #include <cstdint>
 #include <cstring>
 
-#include <algorithm> // std::clamp
+#if __cplusplus < 201703L
+namespace std {
+  template<class T>
+  constexpr const T& clamp(const T& v, const T& lo, const T& hi)
+  {
+      return v < lo ? lo : hi > v ? hi : v;
+  }
+}
+#else
+#  include <algorithm> // std::clamp
+#endif
+
 #include <limits>
 #include <chrono> // std::chrono::system_clock
 
