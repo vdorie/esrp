@@ -4,7 +4,7 @@
 
 \title{Efficient Sparse Random Projections}
 \description{
-  Generate random projections of sparse input vectors of 0s and 1s using
+  Generate random projections of sparse input vectors using
   multiple threads, allowing for millions of dimensions of projected
   coordinates on consumer-grade hardware.
 }
@@ -12,6 +12,7 @@
 generate_random_projections(
   u,
   k,
+  x = NULL,
   seed = NA_integer_,
   d = NA_integer_,
   type = c("normal", "discrete"),
@@ -19,12 +20,13 @@ generate_random_projections(
 )
 }
 \arguments{
-  \item{u}{a list of integer binary input vectors; these are coded
-  sparsely, and as such correspond to the indices of values present}
+  \item{u}{a list of input indices vectors}
   \item{k}{integer giving the desired number of output dimensions}
+  \item{x}{optional list of real vectors of length equal to \code{u} where
+  each element must have the same length as \code{u[[i]]}. These are
+  the values that are projected, and if absent are assumed to be 1s}
   \item{seed}{an optional integer giving a seed used when creating pseudo
-  random number generators for each input dimension
-  }
+  random number generators for each input dimension}
   \item{d}{an optional integer giving the size of the input space. Since the
   inputs are coded sparsely, it is possible to supply \code{u} without giving
   the size of the space in which those vectors are embedded. However,
@@ -92,9 +94,15 @@ u1 <- sample(100000L, 1000L, replace = FALSE) - 1L
 u2 <- sample(u1, 200L, replace = FALSE)
 u2 <- c(u2, sample(100000L, 30L, replace = FALSE))
 
+x <- list(
+  rnorm(length(u1))
+  rnorm(length(u2))
+)
+
 v_mt <- esrp::generate_random_projections(
   u = list(u1, u2),
   k = 50001,
+  x = x,
   threads = 2,
   seed = 0
 )
@@ -103,6 +111,7 @@ v_mt <- esrp::generate_random_projections(
 v_st <- esrp::generate_random_projections(
   u = list(u1, u2),
   k = 50001,
+  x = x,
   threads = 1,
   seed = 0
 )

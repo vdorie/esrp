@@ -87,16 +87,32 @@ double generate_discrete(T& generator, void* v_info) {
 
 extern "C" {
 
-SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SEXP options_expr) {
+SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SEXP x_expr, SEXP options_expr) {
   int* indices = INTEGER(indices_expr);
   
   const int** us = NULL;
   unsigned int num_input_vectors = u_expr != R_NilValue ? LENGTH(u_expr) : 0;
   if (num_input_vectors > 0) {
-    us = reinterpret_cast<const int**>(alloca(LENGTH(u_expr) * sizeof(const int*)));
+    us = reinterpret_cast<const int**>(alloca(num_input_vectors * sizeof(const int*)));
 
     for (unsigned int l = 0; l < num_input_vectors; ++l) {
       us[l] = const_cast<const int*>(INTEGER(VECTOR_ELT(u_expr, l)));
+    }
+  }
+  const double** xs = NULL;
+  unsigned int num_x_vectors = x_expr != R_NilValue ? LENGTH(x_expr) : 0;
+  if (num_x_vectors > 0) {
+    if (num_input_vectors > 0) {
+      if (num_x_vectors != num_input_vectors)
+        Rf_error("if non-NULL, length of x must equal length of u");
+    } else {
+      if (num_x_vectors != 1)
+        Rf_error("if non-NULL, length of x must equal 1");
+    }
+    xs = reinterpret_cast<const double**>(alloca(num_x_vectors * sizeof(const double*)));
+    
+    for (unsigned int l = 0; l < num_x_vectors; ++l) {
+      xs[l] = const_cast<const double*>(REAL(VECTOR_ELT(x_expr, l)));
     }
   }
   unsigned int k = static_cast<unsigned int>(INTEGER(k_expr)[0]);
@@ -141,7 +157,7 @@ SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SE
       Rf_error("unrecognized option name");
     }
   }
-  ;
+  
   if (options.output_length == 0)
     options.output_length = k;
   if (options.random_type == RANDOM_TYPE_DISCRETE && options.d == 0)
@@ -194,23 +210,42 @@ SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SE
     unsigned int n1 = static_cast<unsigned int>(LENGTH(indices_expr));
     int* u1 = indices;
     double* v1 = vs[0];
+    const double* x = NULL;
+    
+    if (num_x_vectors == 0) {
+      while (i1 < n1) {
+        if (u1[i1] > i0)
+          seed_generator.discard(u1[i1] - i0);
+        row_seed = seed_generator();
+        boost::random::mt19937 row_generator(row_seed);
+        
+        if (options.row_start > 0)
+          row_generator.discard(options.row_start);
 
-    while (i1 < n1) {
-      if (u1[i1] > i0)
-        seed_generator.discard(u1[i1] - i0);
-      row_seed = seed_generator();
-      boost::random::mt19937 row_generator(row_seed);
-      
-      if (options.row_start > 0)
-        row_generator.discard(options.row_start);
-
-      for (unsigned int j = 0; j < options.output_length; ++j) {
-        double rn = generate_random_number(row_generator, generator_info);
-        v1[j] += (rn - v1[j]) / static_cast<double>(i1 + 1);
+        for (unsigned int j = 0; j < options.output_length; ++j) {
+          double rn = generate_random_number(row_generator, generator_info);
+          v1[j] += (rn - v1[j]) / static_cast<double>(i1 + 1);
+        }
+        i0 = u1[i1++] + 1;
       }
-      i0 = u1[i1++] + 1;
-    }
+    } else {
+      x = xs[0];
+      while (i1 < n1) {
+        if (u1[i1] > i0)
+          seed_generator.discard(u1[i1] - i0);
+        row_seed = seed_generator();
+        boost::random::mt19937 row_generator(row_seed);
+        
+        if (options.row_start > 0)
+          row_generator.discard(options.row_start);
 
+        for (unsigned int j = 0; j < options.output_length; ++j) {
+          double rn = generate_random_number(row_generator, generator_info);
+          v1[j] += (x[i1] * rn - v1[j]) / static_cast<double>(i1 + 1);
+        }
+        i0 = u1[i1++] + 1;
+      }
+    }
     for (unsigned int j = 0; j < options.output_length; ++j) {
       v1[j] *= static_cast<double>(i1) / sqrt(static_cast<double>(k));
     }
@@ -224,39 +259,78 @@ SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SE
     }
     
     bool finished = false;
-    while (!finished) {
-      int next_index = std::numeric_limits<int>::max();
-      // finding the next iteration can be stored in a data structure to be made
-      // faster, depending on the number of input vectors; it likely is fastest
-      // to brute force for ~<= 5
-      for (unsigned int l = 0; l < num_vectors; ++l) {
-        if (is[l] < ns[l] && us[l][is[l]] < next_index)
-          next_index = us[l][is[l]];
-      }
-      if (next_index > i0)
-        seed_generator.discard(next_index - i0);
-      row_seed = seed_generator();
-      boost::random::mt19937 row_generator(row_seed);
-
-      if (options.row_start > 0)
-        row_generator.discard(options.row_start);
-
-      for (unsigned int j = 0; j < options.output_length; ++j) {
-        double rn = generate_random_number(row_generator, generator_info);
+    
+    if (num_x_vectors == 0) {
+      while (!finished) {
+        int next_index = std::numeric_limits<int>::max();
+        // finding the next iteration can be stored in a data structure to be made
+        // faster, depending on the number of input vectors; it likely is fastest
+        // to brute force for ~<= 5
         for (unsigned int l = 0; l < num_vectors; ++l) {
-          if (us[l][is[l]] == next_index) {
-            vs[l][j] += (rn - vs[l][j]) / static_cast<double>(is[l] + 1);
+          if (is[l] < ns[l] && us[l][is[l]] < next_index)
+            next_index = us[l][is[l]];
+        }
+        if (next_index > i0)
+          seed_generator.discard(next_index - i0);
+        row_seed = seed_generator();
+        boost::random::mt19937 row_generator(row_seed);
+
+        if (options.row_start > 0)
+          row_generator.discard(options.row_start);
+
+        for (unsigned int j = 0; j < options.output_length; ++j) {
+          double rn = generate_random_number(row_generator, generator_info);
+          for (unsigned int l = 0; l < num_vectors; ++l) {
+            if (us[l][is[l]] == next_index) {
+              vs[l][j] += (rn - vs[l][j]) / static_cast<double>(is[l] + 1);
+            }
           }
         }
+        i0 = next_index + 1;
+        
+        finished = true;
+        for (unsigned int l = 0; l < num_vectors; ++l) {
+          if (us[l][is[l]] == next_index)
+            is[l]++;
+          if (is[l] < ns[l])
+            finished = false;
+        }
       }
-      i0 = next_index + 1;
-      
-      finished = true;
-      for (unsigned int l = 0; l < num_vectors; ++l) {
-        if (us[l][is[l]] == next_index)
-          is[l]++;
-        if (is[l] < ns[l])
-          finished = false;
+    } else {
+      while (!finished) {
+        int next_index = std::numeric_limits<int>::max();
+        // finding the next iteration can be stored in a data structure to be made
+        // faster, depending on the number of input vectors; it likely is fastest
+        // to brute force for ~<= 5
+        for (unsigned int l = 0; l < num_vectors; ++l) {
+          if (is[l] < ns[l] && us[l][is[l]] < next_index)
+            next_index = us[l][is[l]];
+        }
+        if (next_index > i0)
+          seed_generator.discard(next_index - i0);
+        row_seed = seed_generator();
+        boost::random::mt19937 row_generator(row_seed);
+
+        if (options.row_start > 0)
+          row_generator.discard(options.row_start);
+
+        for (unsigned int j = 0; j < options.output_length; ++j) {
+          double rn = generate_random_number(row_generator, generator_info);
+          for (unsigned int l = 0; l < num_vectors; ++l) {
+            if (us[l][is[l]] == next_index) {
+              vs[l][j] += (xs[l][is[l]] * rn - vs[l][j]) / static_cast<double>(is[l] + 1);
+            }
+          }
+        }
+        i0 = next_index + 1;
+        
+        finished = true;
+        for (unsigned int l = 0; l < num_vectors; ++l) {
+          if (us[l][is[l]] == next_index)
+            is[l]++;
+          if (is[l] < ns[l])
+            finished = false;
+        }
       }
     }
     

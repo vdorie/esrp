@@ -1,19 +1,20 @@
-get_projections_seeded <- function(row_start, output_length, indices, u, k, options) {
+get_projections_seeded <- function(row_start, output_length, indices, u, k, x, options) {
   options$row_start <- row_start
   options$output_length <- output_length
   
-  .Call(C_esrp_generate_random_projections, indices, u, k, options)
+  .Call(C_esrp_generate_random_projections, indices, u, k, x, options)
 }
 
-get_projections_unseeded <- function(output_length, indices, u, k, options) {
+get_projections_unseeded <- function(output_length, indices, u, k, x, options) {
   options$output_length <- output_length
   
-  .Call(C_esrp_generate_random_projections, indices, u, k, options)
+  .Call(C_esrp_generate_random_projections, indices, u, k, x, options)
 }
 
 generate_random_projections <- function(
   u,
   k,
+  x = NULL,
   seed = NA_integer_,
   d = NA_integer_,
   type = c("normal", "discrete"),
@@ -23,11 +24,28 @@ generate_random_projections <- function(
 
   if (!is.list(u)) u <- list(u)
   type <- match.arg(type)
+  if (!is.null(x) && !is.list(x)) x <- list(x)
   
   if (!all(sapply(u, typeof) == "integer"))
     stop("all input vectors must be of integer type")
   indices <- sort(Reduce(union, u))
-  u <- lapply(u, sort)
+  if (!is.null(x)) {
+    if (length(x) != length(u))
+      stop("length of x must equal length of u")
+
+    if (!all(sapply(x, typeof) == "double"))
+      stop("all input x must be of double type")
+    
+    for (i in seq_along(u)) {
+      if (length(u[[i]]) != length(x[[i]]))
+        stop("x at position ", i, " does not have the same length as u at position ", i)
+      o <- order(u[[i]])
+      u[[i]] <- u[[i]][o]
+      x[[i]] <- x[[i]][o]
+    }
+  } else {
+    u <- lapply(u, sort)
+  }
   
   if (type == "discrete" && (is.na(d) || d[1L] < max(lengths(u))))
     stop("for discrete type, 'd' must be a positive integer of length greater than all input vectors")
@@ -75,11 +93,11 @@ generate_random_projections <- function(
       
       clusterExport(cluster, "get_projections_seeded", asNamespace("esrp"))
 
-      cluster_results <- clusterMap(cluster, get_projections_seeded, row_start = row_start, output_length = num_projections_per_thread, MoreArgs = list(indices = indices, u = u, k = k, options = options))
+      cluster_results <- clusterMap(cluster, get_projections_seeded, row_start = row_start, output_length = num_projections_per_thread, MoreArgs = list(indices = indices, u = u, k = k, x = x, options = options))
     } else {
       clusterExport(cluster, "get_projections_unseeded", asNamespace("esrp"))
 
-      cluster_results <- clusterMap(cluster, get_projections_unseeded, output_length = num_projections_per_thread, MoreArgs = list(indices = indices, u = u, k = k, options = options))
+      cluster_results <- clusterMap(cluster, get_projections_unseeded, output_length = num_projections_per_thread, MoreArgs = list(indices = indices, u = u, k = k, x = x, options = options))
     }
     stopCluster(cluster)
     
@@ -89,6 +107,7 @@ generate_random_projections <- function(
       indices,
       u,
       k,
+      x,
       options
     )
   }
