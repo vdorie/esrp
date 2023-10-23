@@ -95,7 +95,7 @@ u2 <- sample(u1, 200L, replace = FALSE)
 u2 <- c(u2, sample(100000L, 30L, replace = FALSE))
 
 x <- list(
-  rnorm(length(u1))
+  rnorm(length(u1)),
   rnorm(length(u2))
 )
 
