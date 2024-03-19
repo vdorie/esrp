@@ -25,6 +25,7 @@ generate_random_projections <- function(
   if (!is.list(u)) u <- list(u)
   type <- match.arg(type)
   if (!is.null(x) && !is.list(x)) x <- list(x)
+  num_input_vectors <- length(u)
   
   if (!all(sapply(u, typeof) == "integer"))
     stop("all input vectors must be of integer type")
@@ -44,7 +45,11 @@ generate_random_projections <- function(
       x[[i]] <- x[[i]][o]
     }
   } else {
-    u <- lapply(u, sort)
+    if (length(u) == 1L) {
+      u <- NULL
+    } else {
+      u <- lapply(u, sort)
+    }
   }
   
   if (type == "discrete" && (is.na(d) || d[1L] < max(lengths(u))))
@@ -101,7 +106,7 @@ generate_random_projections <- function(
     }
     stopCluster(cluster)
     
-    lapply(seq_along(u), function(i) unlist(lapply(seq_len(threads), function(j) cluster_results[[j]][[i]])))
+    lapply(seq_len(num_input_vectors), function(i) unlist(lapply(seq_len(threads), function(j) cluster_results[[j]][[i]])))
   } else {
     .Call(C_esrp_generate_random_projections,
       indices,

@@ -194,7 +194,6 @@ SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SE
     generate_random_number = &generate_discrete;
   }
 
-
   
   unsigned int seed = seed_unset ? std::chrono::system_clock::now().time_since_epoch().count() : options.seed;
   unsigned int row_seed;
@@ -333,10 +332,10 @@ SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SE
         }
       }
     }
-    
+
     for (unsigned int j = 0; j < options.output_length; ++j) {
       for (unsigned int l = 0; l < num_vectors; ++l) {
-        vs[l][j] *= static_cast<double>(is[l]) / sqrt(static_cast<double>(k));
+        vs[l][j] *= static_cast<double>(ns[l]) / std::sqrt(static_cast<double>(k));
       }
     }
   }
@@ -348,6 +347,7 @@ SEXP generate_random_projections(SEXP indices_expr, SEXP u_expr, SEXP k_expr, SE
   }
 
   UNPROTECT(1);
+
   return result_expr;
 }
 
@@ -405,7 +405,7 @@ extern "C" {
 #define DEF_FUNC(_N_, _F_, _A_) { _N_, std::bit_cast<DL_FUNC>(&_F_), _A_ }
 
 static R_CallMethodDef R_callMethods[] = {
-  DEF_FUNC("esrp_generate_random_projections", generate_random_projections, 4),
+  DEF_FUNC("esrp_generate_random_projections", generate_random_projections, 5),
   {NULL, NULL, 0}
 };
 
